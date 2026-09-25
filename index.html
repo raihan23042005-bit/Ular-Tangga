@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ular Tangga Akhlak PAI - SMA Kelas X</title>
+    <!-- Tailwind CSS untuk Styling Responsif dan Modern -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome untuk Ikon -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Inter & Poppins -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Poppins', 'sans-serif'],
+                    },
+                    colors: {
+                        islamic: {
+                            green: '#10B981',
+                            dark: '#064E3B',
+                            gold: '#F59E0B',
+                            blue: '#EFF6FF'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #f0fdf4;
+            background-image: radial-gradient(#dcfce7 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow-x: hidden;
+        }
+
+        /* Tampilan Papan Ular Tangga */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 2px;
+            background: #064E3B;
+            padding: 4px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            aspect-ratio: 2/1; /* 10x5 */
+        }
+
+        @media (max-width: 768px) {
+            #game-board {
+                aspect-ratio: 1/1; /* Lebar dan tinggi sama di HP agar kotak terlihat */
+            }
+        }
+
+        .board-cell {
+            background-color: white;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            font-weight: bold;
+            font-size: 1.2rem;
+            color: #9CA3AF;
+            transition: all 0.3s;
+        }
+
+        .board-cell:nth-child(odd) {
+            background-color: #f8fafc;
+        }
+
+        .board-cell.special-question { background-color: #FEF3C7; color: #D97706; }
+        .board-cell.special-hikmah { background-color: #DBEAFE; color: #2563EB; }
+        .board-cell.special-danger { background-color: #FEE2E2; color: #DC2626; }
+        .board-cell.special-bonus { background-color: #D1FAE5; color: #059669; }
+
+        .cell-number {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .cell-icon {
+            font-size: 1.5rem;
+            opacity: 0.3;
+        }
+
+        /* Garis Ular dan Tangga (Dibuat via SVG absolute overlay) */
+        #svg-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Bidak Pemain */
+        .player-token {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            position: absolute;
+            z-index: 20;
+            transition: top 0.4s ease, left 0.4s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            border: 2px solid white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.7rem;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Animasi Dadu */
+        .dice-container {
+            width: 80px;
+            height: 80px;
+            perspective: 1000px;
+            margin: 0 auto;
+        }
+        
+        .dice {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .dice-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            color: #064E3B;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* Rotasi Muka Dadu (Simplified for 2D representation in 3D space) */
+        .front  { transform: translateZ(40px); }
+        .back   { transform: rotateY(180deg) translateZ(40px); }
+        .right  { transform: rotateY(90deg) translateZ(40px); }
+        .left   { transform: rotateY(-90deg) translateZ(40px); }
+        .top    { transform: rotateX(90deg) translateZ(40px); }
+        .bottom { transform: rotateX(-90deg) translateZ(40px); }
+
+        .rolling {
+            animation: roll 1s infinite linear;
+        }
+
+        @keyframes roll {
+            0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
+            100% { transform: rotateX(360deg) rotateY(360deg) rotateZ(360deg); }
+        }
+
+        /* Modal Transitions */
+        .modal-enter { opacity: 0; transform: scale(0.95); }
+        .modal-enter-active { opacity: 1; transform: scale(1); transition: all 0.3s ease-out; }
+        .modal-exit { opacity: 1; transform: scale(1); }
+        .modal-exit-active { opacity: 0; transform: scale(0.95); transition: all 0.2s ease-in; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #10B981; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #059669; }
+
+        .btn-hover { transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .btn-hover:active { transform: translateY(0); }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col font-sans">
+
+    <!-- AUDIO CONTEXT (Synthesized sounds) -->
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let soundEnabled = true;
+
+        function playSound(type) {
+            if (!soundEnabled || audioCtx.state === 'suspended') return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'roll') {
+                oscillator.type = 'square';
+                oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'move') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.05);
+            } else if (type === 'correct') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+                oscillator.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.1); // E5
+                oscillator.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.2); // G5
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.4);
+            } else if (type === 'wrong') {
+                oscillator.type = 'sawtooth';
+                oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'ladder') {
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(300, audioCtx.currentTime);
+                oscillator.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.5);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5);
+            } else if (type === 'snake') {
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+                oscillator.frequency.linearRampToValueAtTime(150, audioCtx.currentTime + 0.5);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5);
+            } else if (type === 'win') {
+                oscillator.type = 'square';
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    setTimeout(() => {
+                        const osc = audioCtx.createOscillator();
+                        const gn = audioCtx.createGain();
+                        osc.connect(gn); gn.connect(audioCtx.destination);
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gn.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                        gn.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+                    }, i * 150);
+                });
+            }
+        }
+        
+        // Membuka Audio Context pada interaksi pertama pengguna
+        document.addEventListener('click', () => { if(audioCtx.state === 'suspended') audioCtx.resume(); }, {once:true});
+    </script>
+
+    <!-- HEADER -->
+    <header class="bg-white shadow-sm p-4 z-50">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="showView('landing')">
+                <div class="w-10 h-10 bg-islamic-green text-white rounded-lg flex items-center justify-center text-xl shadow-md">
+                    <i class="fa-solid fa-kaaba"></i>
+                </div>
+                <h1 class="font-heading font-bold text-xl text-islamic-dark hidden sm:block">Ular Tangga Akhlak</h1>
+            </div>
+            <nav class="flex gap-2 sm:gap-4">
+                <button onclick="showView('material')" class="text-gray-600 hover:text-islamic-green font-medium text-sm sm:text-base transition">Materi</button>
+                <button onclick="showView('practice')" class="text-gray-600 hover:text-islamic-green font-medium text-sm sm:text-base transition">Latihan</button>
+                <button onclick="toggleSound()" class="text-gray-600 hover:text-islamic-green w-8 text-center" id="btn-sound">
+                    <i class="fa-solid fa-volume-high"></i>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow flex flex-col relative overflow-hidden">
+        
+        <!-- 1. LANDING PAGE -->
+        <div id="view-landing" class="absolute inset-0 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-green-50 to-blue-50 transition-all duration-500 z-10">
+            <div class="text-center max-w-3xl">
+                <div class="inline-block p-4 bg-white rounded-full shadow-lg mb-6 text-5xl text-islamic-gold">
+                    <i class="fa-solid fa-dice text-islamic-green"></i>
+                </div>
+                <h1 class="font-heading font-extrabold text-4xl sm:text-6xl text-islamic-dark mb-4 tracking-tight">
+                    ULAR TANGGA AKHLAK
+                </h1>
+                <p class="text-lg sm:text-xl text-gray-600 mb-8 font-medium">
+                    Belajar seru menghindari sifat <span class="text-red-500 font-bold">Berfoya-foya</span>, <span class="text-orange-500 font-bold">Riya'</span>, dan <span class="text-purple-500 font-bold">Sum'ah</span>.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button onclick="showView('setup')" class="btn-hover bg-islamic-green text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-play"></i> MULAI PERMAINAN
+                    </button>
+                    <button onclick="showView('material')" class="btn-hover bg-white text-islamic-dark border-2 border-islamic-green px-8 py-4 rounded-xl font-bold text-lg shadow-md flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-book-open"></i> PELAJARI MATERI
+                    </button>
+                </div>
+                <div class="mt-12 text-sm text-gray-500">
+                    Sesuai untuk Pembelajaran PAI & Budi Pekerti SMA Kelas X
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. SETUP PAGE -->
+        <div id="view-setup" class="hidden absolute inset-0 overflow-y-auto p-4 sm:p-8 bg-white z-20">
+            <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-6 sm:p-10 border border-gray-100">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="font-heading font-bold text-3xl text-islamic-dark">Pengaturan Permainan</h2>
+                    <button onclick="showView('landing')" class="text-gray-400 hover:text-red-500 text-xl"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Jumlah Pemain -->
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Jumlah Pemain</label>
+                        <div class="flex gap-4">
+                            <button class="player-count-btn flex-1 py-3 rounded-lg border-2 border-gray-200 font-bold text-gray-600 hover:border-islamic-green hover:text-islamic-green" data-count="2">2 Pemain</button>
+                            <button class="player-count-btn flex-1 py-3 rounded-lg border-2 border-gray-200 font-bold text-gray-600 hover:border-islamic-green hover:text-islamic-green" data-count="3">3 Pemain</button>
+                            <button class="player-count-btn flex-1 py-3 rounded-lg border-2 border-gray-200 font-bold text-gray-600 hover:border-islamic-green hover:text-islamic-green" data-count="4">4 Pemain</button>
+                        </div>
+                    </div>
+
+                    <!-- Level Kesulitan -->
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">Tingkat Kesulitan Soal</label>
+                        <select id="setting-difficulty" class="w-full p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-islamic-green font-medium">
+                            <option value="all">Campuran (Semua Level)</option>
+                            <option value="Mudah">Level 1 - Pemula (Pengertian & Contoh)</option>
+                            <option value="Sedang">Level 2 - Menengah (Kasus Remaja)</option>
+                            <option value="Sulit">Level 3 - Tantangan (Analisis)</option>
+                        </select>
+                    </div>
+
+                    <!-- Nama Pemain -->
+                    <div id="player-names-container" class="space-y-3 pt-4 border-t border-gray-100">
+                        <!-- Injected via JS -->
+                    </div>
+
+                    <button onclick="startGame()" class="w-full bg-islamic-gold hover:bg-yellow-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg btn-hover mt-6 transition-colors">
+                        MULAI MAIN SEKARANG
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. MATERIAL PAGE -->
+        <div id="view-material" class="hidden absolute inset-0 overflow-y-auto bg-gray-50 z-20 p-4 sm:p-8">
+            <div class="max-w-5xl mx-auto">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="font-heading font-bold text-3xl text-islamic-dark">Materi Pembelajaran</h2>
+                    <button onclick="showView('landing')" class="btn-hover bg-white px-4 py-2 rounded-lg shadow text-gray-600 font-bold">Kembali</button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <!-- Foya-foya -->
+                    <div class="bg-white rounded-2xl p-6 shadow-md border-t-4 border-red-500">
+                        <div class="w-12 h-12 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-wallet"></i></div>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">Berfoya-foya</h3>
+                        <p class="text-gray-600 text-sm mb-4">Perilaku membelanjakan harta secara berlebihan, melampaui batas kewajaran, dan tidak sesuai kebutuhan sejati.</p>
+                        <ul class="text-sm text-gray-500 list-disc pl-4 space-y-1">
+                            <li>Membeli barang mahal demi gengsi.</li>
+                            <li>Sering belanja impulsif di e-commerce.</li>
+                            <li>Tidak bisa membedakan "kebutuhan" dan "keinginan".</li>
+                        </ul>
+                    </div>
+                    <!-- Riya' -->
+                    <div class="bg-white rounded-2xl p-6 shadow-md border-t-4 border-orange-500">
+                        <div class="w-12 h-12 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-eye"></i></div>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">Riya'</h3>
+                        <p class="text-gray-600 text-sm mb-4">Melakukan amal kebaikan atau ibadah dengan niat agar <b>dilihat</b> dan mendapat pujian dari manusia, bukan ikhlas karena Allah.</p>
+                        <ul class="text-sm text-gray-500 list-disc pl-4 space-y-1">
+                            <li>Upload foto sedang ibadah agar dipuji alim.</li>
+                            <li>Rajin shalat hanya ketika dilihat calon mertua/guru.</li>
+                            <li>Niat ibadah bercampur pamrih duniawi.</li>
+                        </ul>
+                    </div>
+                    <!-- Sum'ah -->
+                    <div class="bg-white rounded-2xl p-6 shadow-md border-t-4 border-purple-500">
+                        <div class="w-12 h-12 bg-purple-100 text-purple-500 rounded-full flex items-center justify-center text-2xl mb-4"><i class="fa-solid fa-bullhorn"></i></div>
+                        <h3 class="font-bold text-xl mb-2 text-gray-800">Sum'ah</h3>
+                        <p class="text-gray-600 text-sm mb-4">Sengaja menceritakan atau <b>memperdengarkan</b> amal kebaikan yang telah dilakukan kepada orang lain agar mendapat ketenaran/pujian.</p>
+                        <ul class="text-sm text-gray-500 list-disc pl-4 space-y-1">
+                            <li>Bercerita ke teman tentang jumlah sedekah kemarin.</li>
+                            <li>Menceritakan tahajudnya semalam agar dikagumi.</li>
+                            <li>Sama berbahayanya dengan riya', menghapus pahala.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="bg-islamic-green rounded-2xl p-6 sm:p-8 shadow-lg text-white">
+                    <h3 class="font-heading font-bold text-2xl mb-4 flex items-center gap-2"><i class="fa-solid fa-shield-halved"></i> Cara Menghindari</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-start gap-3"><div class="mt-1"><i class="fa-solid fa-check text-islamic-gold"></i></div><p><b>Luruskan Niat:</b> Selalu perbarui niat ibadah hanya untuk Allah (Ikhlas).</p></div>
+                        <div class="flex items-start gap-3"><div class="mt-1"><i class="fa-solid fa-check text-islamic-gold"></i></div><p><b>Hidup Sederhana:</b> Belanja sesuai kebutuhan, sisihkan untuk menabung/sedekah.</p></div>
+                        <div class="flex items-start gap-3"><div class="mt-1"><i class="fa-solid fa-check text-islamic-gold"></i></div><p><b>Sembunyikan Amal:</b> Latih diri beramal sembunyi-sembunyi seperti menyembunyikan aib.</p></div>
+                        <div class="flex items-start gap-3"><div class="mt-1"><i class="fa-solid fa-check text-islamic-gold"></i></div><p><b>Bijak Bersosial Media:</b> Filter apa yang akan di-posting, hindari flexing/pamer.</p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. GAME PAGE -->
+        <div id="view-game" class="hidden absolute inset-0 flex flex-col md:flex-row bg-gray-100 z-20">
+            
+            <!-- Sidebar / Control Panel -->
+            <div class="w-full md:w-80 bg-white shadow-lg z-30 flex flex-col order-2 md:order-1 h-auto md:h-full shrink-0">
+                <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-heading font-bold text-lg">Papan Skor</h3>
+                    <button onclick="showView('setup')" class="text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300" title="Mode Guru / Reset"><i class="fa-solid fa-gear"></i> Setel Ulang</button>
+                </div>
+                
+                <!-- Player Stats -->
+                <div id="player-stats" class="flex-grow overflow-y-auto p-4 space-y-3">
+                    <!-- Injected via JS -->
+                </div>
+
+                <!-- Dice Area -->
+                <div class="p-6 bg-blue-50 border-t flex flex-col items-center">
+                    <div id="turn-indicator" class="text-sm font-bold text-islamic-dark mb-4 text-center">Giliran: <span id="current-player-name" class="text-islamic-gold text-lg block">Player 1</span></div>
+                    
+                    <div class="dice-container mb-6" id="dice-container">
+                        <div class="dice" id="dice">
+                            <div class="dice-face front">1</div>
+                            <div class="dice-face back">6</div>
+                            <div class="dice-face right">3</div>
+                            <div class="dice-face left">4</div>
+                            <div class="dice-face top">2</div>
+                            <div class="dice-face bottom">5</div>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-roll" onclick="rollDice()" class="w-full py-3 bg-islamic-green hover:bg-islamic-dark text-white font-bold rounded-xl shadow-lg btn-hover flex items-center justify-center gap-2 text-lg">
+                        <i class="fa-solid fa-dice"></i> LEMPAR DADU
+                    </button>
+                    <div id="dice-result-text" class="h-6 mt-2 text-center font-bold text-gray-700"></div>
+                </div>
+            </div>
+
+            <!-- Board Area -->
+            <div class="flex-grow p-4 sm:p-8 flex items-center justify-center overflow-auto order-1 md:order-2 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZTBmOGUxIj48L3JlY3Q+CjxwYXRoIGQ9Ik0wIDBMOCA4Wk04IDBMMCA4WiIgc3Ryb2tlPSIjY2NlYmQ2IiBzdHJva2Utd2lkdGg9IjEiPjwvcGF0aD4KPC9zdmc+')]">
+                <div id="game-board-container" class="relative w-full max-w-4xl mx-auto flex items-center justify-center">
+                    <div id="game-board">
+                        <!-- Cells injected via JS -->
+                        <svg id="svg-layer"></svg> <!-- For drawing Snakes & Ladders -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODALS OVERLAYS -->
+        <div id="modal-overlay" class="hidden absolute inset-0 bg-gray-900 bg-opacity-75 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            
+            <!-- Question Modal -->
+            <div id="modal-question" class="hidden bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all">
+                <div class="bg-islamic-dark text-white p-4 sm:p-6 text-center relative">
+                    <span id="q-category-badge" class="absolute top-4 left-4 text-xs font-bold px-2 py-1 bg-white text-islamic-dark rounded uppercase tracking-wide">Foya-foya</span>
+                    <span id="q-difficulty-badge" class="absolute top-4 right-4 text-xs font-bold px-2 py-1 bg-islamic-gold text-white rounded uppercase">Sedang</span>
+                    <h3 class="font-heading font-bold text-xl sm:text-2xl mt-6 mb-2">UJI PEMAHAMANMU!</h3>
+                </div>
+                <div class="p-6 sm:p-8">
+                    <p id="q-text" class="text-gray-800 text-lg sm:text-xl font-medium mb-6 leading-relaxed">
+                        Pertanyaan akan muncul di sini...
+                    </p>
+                    <div id="q-options" class="space-y-3">
+                        <!-- Options injected via JS -->
+                    </div>
+                </div>
+                <!-- Feedback Area (Hidden initially) -->
+                <div id="q-feedback" class="hidden p-6 bg-gray-50 border-t">
+                    <div class="flex items-center gap-4 mb-3">
+                        <div id="q-feedback-icon" class="text-3xl"></div>
+                        <div>
+                            <h4 id="q-feedback-title" class="font-bold text-xl"></h4>
+                            <p id="q-feedback-points" class="text-sm font-bold mt-1"></p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg border text-gray-700 text-sm mt-4">
+                        <p class="font-semibold text-xs text-gray-500 uppercase mb-1">Pembahasan:</p>
+                        <p id="q-feedback-explanation"></p>
+                    </div>
+                    <button id="btn-q-continue" class="w-full mt-4 py-3 bg-islamic-green text-white font-bold rounded-lg btn-hover">LANJUTKAN PERMAINAN</button>
+                </div>
+            </div>
+
+            <!-- Special Action Modal (Hikmah, Danger, etc) -->
+            <div id="modal-special" class="hidden bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden text-center transform transition-all">
+                <div id="sp-header" class="p-6 text-white text-4xl">
+                    <i id="sp-icon" class="fa-solid fa-star"></i>
+                </div>
+                <div class="p-6">
+                    <h3 id="sp-title" class="font-heading font-bold text-2xl mb-2 text-gray-800">Judul</h3>
+                    <p id="sp-message" class="text-gray-600 mb-6">Pesan khusus di sini...</p>
+                    <div id="sp-actions" class="flex flex-col gap-3">
+                        <!-- Buttons injected via JS if needed, or simple continue -->
+                        <button id="btn-sp-continue" class="w-full py-3 bg-gray-800 text-white font-bold rounded-lg btn-hover">TUTUP</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Over / Result Modal -->
+            <div id="modal-result" class="hidden bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden transform transition-all max-h-[90vh] flex flex-col">
+                <div class="bg-gradient-to-r from-islamic-green to-teal-500 text-white p-8 text-center shrink-0">
+                    <h2 class="font-heading font-extrabold text-3xl sm:text-4xl mb-2">🎉 PERMAINAN SELESAI! 🎉</h2>
+                    <p class="text-teal-100">Alhamdulillah, perjalanan mencapai puncak telah berakhir.</p>
+                </div>
+                <div class="p-6 overflow-y-auto flex-grow bg-gray-50">
+                    <div id="winner-banner" class="bg-white p-6 rounded-xl shadow border border-yellow-200 text-center mb-6">
+                        <i class="fa-solid fa-trophy text-5xl text-islamic-gold mb-3"></i>
+                        <h3 class="text-gray-500 font-bold text-sm uppercase tracking-wide">Pemenang Pertama</h3>
+                        <div id="winner-name" class="font-heading font-bold text-3xl text-islamic-dark">Nama Pemain</div>
+                    </div>
+                    
+                    <h4 class="font-bold text-gray-700 mb-4 text-lg border-b pb-2">Statistik Akhir</h4>
+                    <div id="result-stats" class="space-y-3 mb-8">
+                        <!-- Injected via JS -->
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 p-6 rounded-xl">
+                        <h4 class="font-bold text-blue-800 mb-3"><i class="fa-solid fa-lightbulb text-yellow-500 mr-2"></i> Refleksi: Apa yang kamu pelajari?</h4>
+                        <select class="w-full p-3 border rounded-lg bg-white text-gray-700" onchange="this.style.borderColor='#10B981'; this.nextElementSibling.classList.remove('hidden');">
+                            <option value="">-- Pilih pelajaran yang kamu dapatkan --</option>
+                            <option>Saya harus hidup sederhana dan tidak memaksakan diri.</option>
+                            <option>Saya harus menjaga keikhlasan dalam setiap ibadah.</option>
+                            <option>Saya akan menghindari pamer di media sosial.</option>
+                            <option>Ketenaran di dunia maya bukan segalanya, ridha Allah yang utama.</option>
+                        </select>
+                        <p class="hidden mt-3 text-sm text-islamic-green font-bold"><i class="fa-solid fa-check-circle"></i> Alhamdulillah, semoga dapat diterapkan dalam kehidupan sehari-hari!</p>
+                    </div>
+                </div>
+                <div class="p-4 bg-white border-t flex justify-center shrink-0">
+                    <button onclick="location.reload()" class="bg-islamic-dark text-white px-8 py-3 rounded-lg font-bold btn-hover"><i class="fa-solid fa-rotate-right mr-2"></i> MAIN LAGI</button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- 1. CONFIGURATIONS & STATE ---
+        const totalCells = 50;
+        const colors = ['#EF4444', '#3B82F6', '#F59E0B', '#8B5CF6']; // Red, Blue, Yellow, Purple
+
+        // Board Elements
+        const snakesAndLadders = [
+            { start: 3, end: 12, type: 'ladder', msg: 'Naik! Perilaku sederhana membawa kebaikan.' },
+            { start: 8, end: 20, type: 'ladder', msg: 'Naik! Menabung pangkal kaya.' },
+            { start: 17, end: 29, type: 'ladder', msg: 'Naik! Ikhlas beramal membuat hati tenang.' },
+            { start: 25, end: 38, type: 'ladder', msg: 'Naik! Menyembunyikan sedekah itu mulia.' },
+            { start: 34, end: 45, type: 'ladder', msg: 'Naik! Bersyukur menjauhkan dari foya-foya.' },
+            { start: 14, end: 6, type: 'snake', msg: 'Terjatuh! Belanja karena gengsi merugikan.' },
+            { start: 23, end: 11, type: 'snake', msg: 'Terjatuh! Pamer di medsos merusak pahala.' },
+            { start: 32, end: 18, type: 'snake', msg: 'Terjatuh! Boros adalah teman setan.' },
+            { start: 41, end: 27, type: 'snake', msg: 'Terjatuh! Niat ibadah karena riya tidak diterima.' },
+            { start: 48, end: 35, type: 'snake', msg: 'Terjatuh! Menceritakan amal (sum\'ah) berbahaya.' },
+        ];
+
+        // Specific squares functionality mapping
+        const specialSquaresMapping = {
+            5: { type: 'hikmah', title: 'HIKMAH', msg: 'Gunakan harta secukupnya. Tidak semua yang kita inginkan harus kita miliki.', pts: 5, bg: 'special-hikmah' },
+            10: { type: 'question' },
+            15: { type: 'danger', title: 'TERLALU BOROS', msg: 'Kamu menghabiskan uang untuk barang tidak penting. Mundur 3 langkah.', move: -3, bg: 'special-danger' },
+            19: { type: 'question' },
+            22: { type: 'bonus', title: 'BERKAH', msg: 'Kamu rajin bersedekah tanpa pamrih. Maju 3 langkah.', move: 3, bg: 'special-bonus' },
+            28: { type: 'question' },
+            33: { type: 'danger', title: 'PAMER', msg: 'Menceritakan kebaikanmu pada teman agar dipuji. Kehilangan 5 poin.', pts: -5, bg: 'special-danger' },
+            37: { type: 'question' },
+            40: { type: 'reflect', title: 'CEK DIRI', msg: 'Pernahkah kamu membeli sesuatu hanya karena ingin terlihat keren di depan teman?', pts: 5, bg: 'special-hikmah' },
+            44: { type: 'question' },
+            47: { type: 'bonus', title: 'TAWADHU', msg: 'Sikap rendah hatimu patut dicontoh. Maju 1 langkah.', move: 1, bg: 'special-bonus' }
+        };
+        // Add random question squares to make about 15 question squares total
+        [2, 7, 13, 16, 21, 26, 31, 36, 42, 46, 49].forEach(n => {
+            if(!specialSquaresMapping[n] && !snakesAndLadders.find(sl => sl.start === n || sl.end === n)) {
+                specialSquaresMapping[n] = { type: 'question', bg: 'special-question' };
+            }
+        });
+
+        // Application State
+        let state = {
+            playersCount: 2,
+            difficulty: 'all',
+            players: [],
+            currentPlayerIndex: 0,
+            isRolling: false,
+            gameActive: false,
+            usedQuestions: []
+        };
+
+        // --- 2. QUESTION BANK ---
+        const bankSoal = [
+            // FOYA-FOYA
+            { q: "Apa yang dimaksud dengan perilaku berfoya-foya?", o: ["Menggunakan harta secukupnya", "Membelanjakan harta berlebihan melampaui batas kebutuhan", "Menyimpan seluruh harta tanpa disedekahkan", "Membeli barang untuk kebutuhan sekolah"], a: 1, cat: "Foya-foya", diff: "Mudah", exp: "Berfoya-foya adalah sifat menghamburkan uang/harta untuk hal yang tidak penting dan berlebihan." },
+            { q: "Islam melarang umatnya bersikap tabzir (boros). Hal ini karena pemboros disebut sebagai saudara...", o: ["Malaikat", "Nabi", "Setan", "Jin"], a: 2, cat: "Foya-foya", diff: "Mudah", exp: "Dalam QS Al-Isra: 27 disebutkan bahwa sesungguhnya pemboros itu adalah saudara-saudara setan." },
+            { q: "Raka membeli sepatu merk terbaru seharga jutaan rupiah padahal sepatu lamanya masih sangat layak pakai. Ia membelinya hanya agar tidak dibilang 'ketinggalan zaman' oleh teman tongkrongannya. Perilaku Raka termasuk...", o: ["Tawadhu'", "Sederhana", "Berfoya-foya", "Qana'ah"], a: 2, cat: "Foya-foya", diff: "Sedang", exp: "Membeli barang hanya karena gengsi dan tren, bukan karena kebutuhan, adalah contoh nyata berfoya-foya." },
+            { q: "Siti memiliki uang jajan Rp 50.000. Ia merasa lapar saat istirahat. Sikap yang mencerminkan menghindari foya-foya adalah...", o: ["Membeli makanan seharga Rp 45.000 agar terlihat elit", "Membeli makanan Rp 15.000 yang mengenyangkan, sisanya ditabung", "Mentraktir semua teman walau uangnya kurang", "Tidak makan sama sekali agar uangnya utuh"], a: 1, cat: "Foya-foya", diff: "Sedang", exp: "Menghindari foya-foya berarti bijak mengelola keuangan: memenuhi kebutuhan secukupnya dan menyisihkan untuk ditabung/sedekah." },
+            { q: "Perbedaan utama antara 'kebutuhan' dan 'keinginan' dalam Islam adalah...", o: ["Kebutuhan harus selalu mahal, keinginan itu murah", "Kebutuhan terkait kelangsungan hidup dan ibadah, keinginan dorongan nafsu sementara", "Kebutuhan dilarang agama, keinginan dibolehkan", "Tidak ada perbedaan, keduanya sama-sama harus dipenuhi"], a: 1, cat: "Foya-foya", diff: "Sulit", exp: "Islam mengajarkan agar mengutamakan kebutuhan dasar yang mendukung kehidupan dan ibadah, bukan menuruti nafsu keinginan yang tiada habisnya." },
+            { q: "Di era digital, kemudahan berbelanja online (e-commerce) dengan sistem PayLater sering menjebak remaja. Dampak negatif dari kebiasaan belanja online tanpa kontrol adalah...", o: ["Meningkatkan perekonomian negara", "Terjebak hutang dan gaya hidup konsumtif", "Menjadi lebih modern dan update", "Mudah mendapat teman baru"], a: 1, cat: "Foya-foya", diff: "Sedang", exp: "Gaya hidup konsumtif tanpa kontrol finansial, apalagi berhutang untuk hal tidak penting, akan membawa kesulitan hidup." },
+            { q: "Sikap hati yang selalu merasa cukup dengan apa yang Allah berikan sehingga menjauhkan dari sifat foya-foya disebut...", o: ["Raja'", "Khauf", "Qana'ah", "Syaja'ah"], a: 2, cat: "Foya-foya", diff: "Sulit", exp: "Qana'ah adalah sikap rela menerima dan merasa cukup dengan hasil usahanya yang telah diikhtiarkan, sehingga tidak serakah dan boros." },
+            
+            // RIYA'
+            { q: "Melakukan suatu ibadah dengan tujuan agar dilihat dan mendapat pujian dari manusia disebut...", o: ["Sum'ah", "Riya'", "Nifaq", "Hasad"], a: 1, cat: "Riya'", diff: "Mudah", exp: "Riya' berasal dari kata ru'yah (melihat), artinya beramal agar dilihat orang lain untuk dipuji." },
+            { q: "Hukum asal melakukan perbuatan Riya' dalam ibadah adalah...", o: ["Mubah", "Makruh", "Haram dan Syirik Kecil", "Sunnah"], a: 2, cat: "Riya'", diff: "Mudah", exp: "Riya' diharamkan dan termasuk syirik asghar (syirik kecil) karena menyekutukan Allah dalam niat ibadah." },
+            { q: "Budi sedang shalat Dhuha sendirian di kelas dengan cepat. Tiba-tiba gurunya masuk. Budi langsung memperlambat gerakan shalatnya dan memperbagus bacaannya. Tindakan Budi termasuk...", o: ["Khusyu'", "Riya' perbuatan", "Sum'ah", "Tawadhu'"], a: 1, cat: "Riya'", diff: "Sedang", exp: "Mengubah cara beribadah menjadi lebih baik HANYA KARENA ada orang lain yang melihat adalah bentuk Riya'." },
+            { q: "Andi mengunggah foto dirinya sedang membagikan sembako ke panti asuhan di Instagram dengan caption 'Alhamdulillah bisa berbagi, semoga menginspirasi'. Namun di hatinya terbersit keinginan agar followersnya memujinya sebagai pemuda dermawan. Amal Andi berpotensi terkena penyakit...", o: ["Riya'", "Kikir", "Foya-foya", "Ghibah"], a: 0, cat: "Riya'", diff: "Sedang", exp: "Meskipun dalihnya 'menginspirasi', jika di dalam hati mengharap pujian (like/komen), maka itu sudah termasuk Riya'." },
+            { q: "Salah satu bahaya Riya' bagi amal perbuatan kita adalah...", o: ["Amal menjadi berlipat ganda", "Menghapus pahala amal tersebut", "Membuat kita terkenal di surga", "Menambah teman di dunia"], a: 1, cat: "Riya'", diff: "Sulit", exp: "Ibarat debu di atas batu licin yang tersiram hujan, amal yang disertai Riya' akan hilang pahalanya di sisi Allah SWT." },
+            { q: "Cara terbaik untuk melatih diri terhindar dari sifat Riya' adalah...", o: ["Tidak usah beribadah sama sekali", "Beribadah hanya di malam hari saat tidak ada orang", "Membiasakan ikhlas dan menyembunyikan amal sunnah", "Menceritakan ibadah ke satu orang teman saja"], a: 2, cat: "Riya'", diff: "Sulit", exp: "Melatih keikhlasan bisa dengan memperbanyak amal rahasia (sirr) yang hanya diketahui oleh Allah dan diri sendiri." },
+
+            // SUM'AH
+            { q: "Apa yang membedakan Sum'ah dengan Riya'?", o: ["Sum'ah untuk harta, Riya' untuk jabatan", "Sum'ah melalui pendengaran (menceritakan), Riya' melalui penglihatan", "Sum'ah hukumnya mubah, Riya' haram", "Sum'ah dilakukan orang tua, Riya' oleh remaja"], a: 1, cat: "Sum'ah", diff: "Mudah", exp: "Riya' adalah pamer lewat visual (dilihat), sedangkan Sum'ah pamer lewat audio/cerita (diperdengarkan/diviralkan)." },
+            { q: "Kata Sum'ah berasal dari bahasa Arab 'sami'a' yang berarti...", o: ["Melihat", "Mendengar", "Berbicara", "Menyimpan"], a: 1, cat: "Sum'ah", diff: "Mudah", exp: "Sami'a berarti mendengar, sum'ah artinya memperdengarkan kebaikan kepada orang lain." },
+            { q: "Kemarin malam, Faisal bangun untuk shalat Tahajud. Pagi harinya di sekolah, ia bercerita kepada teman sebangkunya, 'Wah, mataku ngantuk banget nih gara-gara semalam tahajud 8 rakaat ditambah witir panjang'. Perilaku Faisal termasuk...", o: ["Riya'", "Sum'ah", "Syukur", "Tahaddus bin ni'mah"], a: 1, cat: "Sum'ah", diff: "Sedang", exp: "Menceritakan amal ibadah yang sudah berlalu dan rahasia agar dikagumi adalah contoh jelas Sum'ah." },
+            { q: "Ani sudah menyumbang uang untuk pembangunan masjid secara anonim (Hamba Allah). Namun beberapa hari kemudian, ia tidak tahan dan berbisik ke sahabatnya, 'Sebenarnya yang nyumbang Rp 1 juta itu aku lho'. Tindakan Ani ini dapat merusak amalnya karena...", o: ["Masuk kategori foya-foya", "Timbul penyakit Sum'ah", "Uangnya menjadi haram", "Masjidnya tidak jadi dibangun"], a: 1, cat: "Sum'ah", diff: "Sedang", exp: "Amal yang asalnya sudah ikhlas bisa rusak di pertengahan atau akhir jika pelaku menceritakannya demi kebanggaan (Sum'ah)." },
+            { q: "Di era media sosial, batas antara 'berbagi inspirasi' dan 'Sum'ah/Riya'' sangat tipis. Indikator utama yang membedakan keduanya terletak pada...", o: ["Jumlah like yang didapat", "Platform yang digunakan (IG vs TikTok)", "Niat murni di dalam hati semata-mata karena Allah", "Kualitas foto atau video yang diunggah"], a: 2, cat: "Sum'ah", diff: "Sulit", exp: "Hanya Allah dan diri sendiri yang tahu niat asli di hati. Menjaga niat tetap lurus adalah kunci terhindar dari penyakit hati ini." },
+            { q: "Rasulullah SAW bersabda, 'Barangsiapa memperdengarkan amalnya (sum'ah), maka Allah akan memperdengarkan (keburukannya)'. Maksud dari hadis ini adalah...", o: ["Allah akan membuat suaranya merdu", "Allah akan membongkar aib dan niat buruknya di hari kiamat", "Allah akan menjadikannya penyanyi terkenal", "Allah akan menyuruh malaikat memujinya"], a: 1, cat: "Sum'ah", diff: "Sulit", exp: "Balasan bagi orang yang sum'ah di dunia adalah dibongkarnya niat palsunya oleh Allah kelak sehingga ia mendapat kehinaan." },
+
+            // CAMPURAN / ANALISIS
+            { q: "Tiga penyakit hati (Foya-foya, Riya', Sum'ah) memiliki kesamaan dampak negatif bagi pelakunya, yaitu...", o: ["Menambah rezeki", "Membuat tubuh menjadi sehat", "Menghilangkan keberkahan dan pahala", "Menaikkan status sosial secara permanen"], a: 2, cat: "Campuran", diff: "Mudah", exp: "Ketiga sifat ini dibenci Allah, sehingga menghilangkan keberkahan harta dan pahala ibadah." },
+            { q: "Memakai pakaian yang bagus dan bersih saat hendak pergi ke masjid untuk shalat Jumat hukumnya adalah...", o: ["Riya', karena ingin dipuji jamaah lain", "Foya-foya, karena pakaian bagus itu mahal", "Sunnah, sebagai bentuk penghormatan beribadah kepada Allah", "Sum'ah, agar dibicarakan orang"], a: 2, cat: "Campuran", diff: "Sedang", exp: "Allah menyukai keindahan. Memakai pakaian bagus untuk ibadah dengan niat mengagungkan Allah adalah sunnah, bukan riya' atau foya-foya (selama tidak berlebihan)." },
+            { q: "Seorang siswa menabung sisa uang jajannya selama berbulan-bulan untuk membeli sebuah laptop yang sangat ia butuhkan untuk mengerjakan tugas sekolah dan belajar desain. Tindakan ini termasuk...", o: ["Sikap sederhana dan perencanaan yang baik", "Berfoya-foya karena membeli barang elektronik", "Riya' jika ia membawanya ke sekolah", "Pelit terhadap diri sendiri"], a: 0, cat: "Campuran", diff: "Sedang", exp: "Membeli barang mahal tidak otomatis foya-foya JIKA itu adalah kebutuhan fungsional yang penting dan dibeli sesuai kemampuan." },
+            { q: "Anton menolak membeli tas baru yang mahal dan tetap memakai tas lamanya. Namun, ia selalu berkata pada teman-temannya, 'Lihat nih tas ku jelek, aku kan orangnya zuhud dan nggak gila dunia kaya kalian'. Ironisnya, tindakan Anton ini bisa terjerumus pada sifat...", o: ["Qana'ah tingkat tinggi", "Riya' dalam kesederhanaan (merasa paling suci)", "Berfoya-foya waktu", "Ikhlas yang sempurna"], a: 1, cat: "Campuran", diff: "Sulit", exp: "Pamer kesederhanaan dengan merendahkan orang lain agar dipuji sebagai orang zuhud juga merupakan bentuk tersembunyi dari Riya'." }
+        ];
+
+        // --- 3. UI LOGIC & SETUP ---
+
+        // View Router
+        function showView(viewId) {
+            ['landing', 'setup', 'material', 'game'].forEach(id => {
+                document.getElementById(`view-${id}`).classList.add('hidden');
+            });
+            document.getElementById(`view-${viewId}`).classList.remove('hidden');
+            if(viewId === 'setup') initSetupUI();
+        }
+
+        // Setup UI Logic
+        document.querySelectorAll('.player-count-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.player-count-btn').forEach(b => {
+                    b.classList.remove('border-islamic-green', 'text-islamic-green', 'bg-green-50');
+                });
+                e.target.classList.add('border-islamic-green', 'text-islamic-green', 'bg-green-50');
+                state.playersCount = parseInt(e.target.dataset.count);
+                renderPlayerNameInputs();
+            });
+        });
+
+        function renderPlayerNameInputs() {
+            const container = document.getElementById('player-names-container');
+            container.innerHTML = '';
+            for (let i = 0; i < state.playersCount; i++) {
+                container.innerHTML += `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style="background-color: ${colors[i]}">${i+1}</div>
+                        <input type="text" id="p-name-${i}" placeholder="Nama Pemain ${i+1}" class="flex-grow p-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-islamic-green" value="Pemain ${i+1}">
+                    </div>
+                `;
+            }
+        }
+
+        function startGame() {
+            playSound('correct');
+            state.difficulty = document.getElementById('setting-difficulty').value;
+            state.players = [];
+            state.currentPlayerIndex = 0;
+            state.gameActive = true;
+            state.usedQuestions = [];
+
+            for (let i = 0; i < state.playersCount; i++) {
+                const nameInput = document.getElementById(`p-name-${i}`).value.trim();
+                state.players.push({
+                    id: i,
+                    name: nameInput || `Pemain ${i+1}`,
+                    position: 1, // Start at square 1
+                    score: 0,
+                    correct: 0,
+                    wrong: 0,
+                    color: colors[i]
+                });
+            }
+
+            // Shuffle questions to ensure variety
+            state.questionPool = [...bankSoal].sort(() => Math.random() - 0.5);
+
+            buildBoard();
+            updatePlayerStatsUI();
+            updateTurnUI();
+            showView('game');
+            drawPlayers(); // Initial placement
+            drawSnakesAndLaddersSvg();
+        }
+
+        // --- 4. BOARD RENDERING ---
+        function buildBoard() {
+            const board = document.getElementById('game-board');
+            // Remove existing cells except SVG
+            Array.from(board.children).forEach(c => { if(c.tagName !== 'SVG') c.remove() });
+            
+            // Build cells from 50 down to 1 visually, following zig-zag
+            for (let row = 4; row >= 0; row--) {
+                for (let col = 0; col < 10; col++) {
+                    let num;
+                    // Even rows (0,2,4 from bottom) go Left to Right
+                    // Odd rows (1,3 from bottom) go Right to Left
+                    if (row % 2 === 0) {
+                        num = row * 10 + col + 1;
+                    } else {
+                        num = row * 10 + (9 - col) + 1;
+                    }
+
+                    const cell = document.createElement('div');
+                    cell.className = 'board-cell';
+                    cell.id = `cell-${num}`;
+                    
+                    // Add special styling
+                    if (specialSquaresMapping[num]) {
+                        cell.classList.add(specialSquaresMapping[num].bg);
+                        if (specialSquaresMapping[num].type === 'question') {
+                            cell.innerHTML = `<span class="cell-number">${num}</span><i class="fa-solid fa-question cell-icon text-yellow-500"></i>`;
+                        } else if (specialSquaresMapping[num].type === 'hikmah' || specialSquaresMapping[num].type === 'reflect') {
+                            cell.innerHTML = `<span class="cell-number">${num}</span><i class="fa-solid fa-lightbulb cell-icon text-blue-400"></i>`;
+                        } else if (specialSquaresMapping[num].type === 'danger') {
+                            cell.innerHTML = `<span class="cell-number">${num}</span><i class="fa-solid fa-triangle-exclamation cell-icon text-red-400"></i>`;
+                        } else if (specialSquaresMapping[num].type === 'bonus') {
+                            cell.innerHTML = `<span class="cell-number">${num}</span><i class="fa-solid fa-gift cell-icon text-green-400"></i>`;
+                        }
+                    } else {
+                        cell.innerHTML = `<span class="cell-number">${num}</span>`;
+                    }
+                    
+                    if(num === 1) cell.innerHTML += `<span class="text-xs font-bold text-green-600 absolute bottom-1">START</span>`;
+                    if(num === 50) cell.innerHTML += `<span class="text-xs font-bold text-yellow-600 absolute bottom-1">FINISH</span>`;
+
+                    // We append sequentially, grid layout handles the visual positioning based on row/col logic above implicitly by just appending 50 items.
+                    // WAIT, grid places elements row by row, left to right.
+                    // So we must append them in the exact order they appear visually.
+                    // Visually: Top row is 50 to 41. Next is 31 to 40. Next is 30 to 21. Next is 11 to 20. Bottom is 10 to 1.
+                    board.appendChild(cell);
+                }
+            }
+            // Fix: The loop above generates numbers incorrectly for visual appending. Let's rewrite the generator for visual layout.
+            board.innerHTML = '<svg id="svg-layer"></svg>'; // Reset
+            
+            for (let visualRow = 0; visualRow < 5; visualRow++) {
+                const logicalRow = 4 - visualRow; // 4 is top, 0 is bottom
+                for (let visualCol = 0; visualCol < 10; visualCol++) {
+                    let num;
+                    if (logicalRow % 2 === 0) {
+                        // L to R: 1-10, 21-30, 41-50
+                        num = logicalRow * 10 + visualCol + 1;
+                    } else {
+                        // R to L: 11-20, 31-40
+                        num = logicalRow * 10 + (9 - visualCol) + 1;
+                    }
+
+                    const cell = document.createElement('div');
+                    cell.className = 'board-cell';
+                    cell.id = `cell-${num}`;
+                    
+                    if (specialSquaresMapping[num]) {
+                        cell.classList.add(specialSquaresMapping[num].bg);
+                        let icon = '';
+                        if(specialSquaresMapping[num].type === 'question') icon = '<i class="fa-solid fa-clipboard-question cell-icon text-yellow-500"></i>';
+                        if(specialSquaresMapping[num].type === 'hikmah' || specialSquaresMapping[num].type === 'reflect') icon = '<i class="fa-solid fa-lightbulb cell-icon text-blue-400"></i>';
+                        if(specialSquaresMapping[num].type === 'danger') icon = '<i class="fa-solid fa-fire cell-icon text-red-400"></i>';
+                        if(specialSquaresMapping[num].type === 'bonus') icon = '<i class="fa-solid fa-gift cell-icon text-green-400"></i>';
+                        cell.innerHTML = `<span class="cell-number">${num}</span>${icon}`;
+                    } else {
+                        cell.innerHTML = `<span class="cell-number">${num}</span>`;
+                    }
+                    if(num === 1) cell.innerHTML += `<span class="text-[0.6rem] sm:text-xs font-bold text-islamic-green absolute bottom-1">START</span>`;
+                    if(num === 50) cell.innerHTML += `<span class="text-[0.6rem] sm:text-xs font-bold text-islamic-gold absolute bottom-1">FINISH</span>`;
+                    
+                    board.appendChild(cell);
+                }
+            }
+        }
+
+        // Draw Snakes and Ladders using SVG lines
+        function drawSnakesAndLaddersSvg() {
+            // Need a slight delay to ensure DOM is rendered and dimensions are available
+            setTimeout(() => {
+                const svg = document.getElementById('svg-layer');
+                svg.innerHTML = ''; // clear
+                const boardRect = document.getElementById('game-board').getBoundingClientRect();
+                
+                snakesAndLadders.forEach(item => {
+                    const startCell = document.getElementById(`cell-${item.start}`);
+                    const endCell = document.getElementById(`cell-${item.end}`);
+                    if(!startCell || !endCell) return;
+
+                    const sRect = startCell.getBoundingClientRect();
+                    const eRect = endCell.getBoundingClientRect();
+
+                    // Calculate relative to board
+                    const sx = sRect.left - boardRect.left + sRect.width / 2;
+                    const sy = sRect.top - boardRect.top + sRect.height / 2;
+                    const ex = eRect.left - boardRect.left + eRect.width / 2;
+                    const ey = eRect.top - boardRect.top + eRect.height / 2;
+
+                    const isLadder = item.type === 'ladder';
+                    
+                    if (isLadder) {
+                        // Draw Ladder (two lines + rungs)
+                        const angle = Math.atan2(ey - sy, ex - sx);
+                        const offsetX = Math.sin(angle) * 8;
+                        const offsetY = -Math.cos(angle) * 8;
+                        
+                        // Left rail
+                        svg.innerHTML += `<line x1="${sx - offsetX}" y1="${sy - offsetY}" x2="${ex - offsetX}" y2="${ey - offsetY}" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round" opacity="0.8"/>`;
+                        // Right rail
+                        svg.innerHTML += `<line x1="${sx + offsetX}" y1="${sy + offsetY}" x2="${ex + offsetX}" y2="${ey + offsetY}" stroke="#8B5CF6" stroke-width="4" stroke-linecap="round" opacity="0.8"/>`;
+                        
+                        // Rungs
+                        const steps = 6;
+                        for(let i=1; i<steps; i++) {
+                            const px = sx + (ex - sx) * (i/steps);
+                            const py = sy + (ey - sy) * (i/steps);
+                            svg.innerHTML += `<line x1="${px - offsetX}" y1="${py - offsetY}" x2="${px + offsetX}" y2="${py + offsetY}" stroke="#8B5CF6" stroke-width="3" opacity="0.8"/>`;
+                        }
+                    } else {
+                        // Draw Snake (curved line)
+                        // Simple bezier curve
+                        const mx = (sx + ex) / 2 + 30; // control point offset
+                        const my = (sy + ey) / 2;
+                        svg.innerHTML += `<path d="M ${sx} ${sy} Q ${mx} ${my} ${ex} ${ey}" fill="none" stroke="#EF4444" stroke-width="8" stroke-linecap="round" stroke-dasharray="4 4" opacity="0.8"/>`;
+                        // Snake Head
+                        svg.innerHTML += `<circle cx="${sx}" cy="${sy}" r="8" fill="#EF4444" />`;
+                    }
+                });
+            }, 500);
+        }
+
+        window.addEventListener('resize', drawSnakesAndLaddersSvg);
+
+        // --- 5. GAME MECHANICS ---
+
+        function updatePlayerStatsUI() {
+            const container = document.getElementById('player-stats');
+            container.innerHTML = '';
+            state.players.forEach((p, index) => {
+                const isActive = index === state.currentPlayerIndex;
+                container.innerHTML += `
+                    <div class="p-3 rounded-lg border-2 ${isActive ? 'border-islamic-green bg-green-50 shadow-md transform scale-105 transition' : 'border-gray-100 bg-white'} flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow" style="background-color: ${p.color}">${p.id+1}</div>
+                        <div class="flex-grow">
+                            <div class="font-bold text-gray-800 leading-tight">${p.name}</div>
+                            <div class="text-xs text-gray-500">Posisi: ${p.position} | Skor: ${p.score}</div>
+                        </div>
+                        ${isActive ? '<i class="fa-solid fa-star text-yellow-400 animate-pulse"></i>' : ''}
+                    </div>
+                `;
+            });
+        }
+
+        function updateTurnUI() {
+            const player = state.players[state.currentPlayerIndex];
+            const nameEl = document.getElementById('current-player-name');
+            nameEl.innerText = player.name;
+            nameEl.style.color = player.color;
+            updatePlayerStatsUI();
+        }
+
+        async function rollDice() {
+            if (state.isRolling || !state.gameActive) return;
+            state.isRolling = true;
+            
+            const btn = document.getElementById('btn-roll');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            playSound('roll');
+            const dice = document.getElementById('dice');
+            dice.classList.add('rolling');
+            
+            document.getElementById('dice-result-text').innerText = "Mengacak...";
+
+            // Simulate roll delay
+            await new Promise(r => setTimeout(r, 1000));
+            
+            dice.classList.remove('rolling');
+            
+            // Random 1-6
+            const result = Math.floor(Math.random() * 6) + 1;
+            
+            // Set rotation to show result
+            setDiceFace(result);
+            
+            document.getElementById('dice-result-text').innerText = `Mendapat angka ${result}!`;
+            
+            await new Promise(r => setTimeout(r, 800)); // wait for user to see result
+            
+            await movePlayer(result);
+        }
+
+        function setDiceFace(number) {
+            const dice = document.getElementById('dice');
+            switch(number) {
+                case 1: dice.style.transform = 'translateZ(-40px)'; break; // shows front (1)
+                case 6: dice.style.transform = 'rotateY(180deg) translateZ(-40px)'; break; // shows back (6)
+                case 3: dice.style.transform = 'rotateY(-90deg) translateZ(-40px)'; break; // shows right (3)
+                case 4: dice.style.transform = 'rotateY(90deg) translateZ(-40px)'; break; // shows left (4)
+                case 2: dice.style.transform = 'rotateX(-90deg) translateZ(-40px)'; break; // shows top (2)
+                case 5: dice.style.transform = 'rotateX(90deg) translateZ(-40px)'; break; // shows bottom (5)
+            }
+        }
+
+        // Draw players on the board
+        function drawPlayers() {
+            // Remove old tokens
+            document.querySelectorAll('.player-token').forEach(t => t.remove());
+            
+            const boardRect = document.getElementById('game-board').getBoundingClientRect();
+
+            state.players.forEach(p => {
+                const cell = document.getElementById(`cell-${p.position}`);
+                if (!cell) return;
+                
+                const token = document.createElement('div');
+                token.className = 'player-token';
+                token.id = `token-${p.id}`;
+                token.style.backgroundColor = p.color;
+                token.innerText = p.id + 1;
+                
+                document.getElementById('game-board-container').appendChild(token);
+                
+                // Calculate position relative to container
+                const cellRect = cell.getBoundingClientRect();
+                const containerRect = document.getElementById('game-board-container').getBoundingClientRect();
+                
+                // Add slight offset so tokens don't overlap exactly
+                const offset = (p.id * 5) - 5; 
+                
+                token.style.left = `${cellRect.left - containerRect.left + (cellRect.width/2) - 12 + offset}px`;
+                token.style.top = `${cellRect.top - containerRect.top + (cellRect.height/2) - 12 + offset}px`;
+            });
+        }
+
+        async function movePlayer(steps) {
+            const player = state.players[state.currentPlayerIndex];
+            let currentPos = player.position;
+            let targetPos = currentPos + steps;
+
+            // Step by step animation
+            for (let i = 1; i <= steps; i++) {
+                currentPos++;
+                if (currentPos > 50) {
+                    // Bounce back rule
+                    currentPos = 50 - (currentPos - 50); 
+                }
+                player.position = currentPos;
+                drawPlayers();
+                playSound('move');
+                updatePlayerStatsUI(); // Update position text live
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            await evaluateSquare(player);
+        }
+
+        async function evaluateSquare(player) {
+            let pos = player.position;
+            
+            // 1. Check Win
+            if (pos === 50) {
+                await triggerWin();
+                return;
+            }
+
+            // 2. Check Snake or Ladder
+            const slide = snakesAndLadders.find(sl => sl.start === pos);
+            if (slide) {
+                await showNotificationModal(slide.type === 'ladder' ? 'Naik Tangga!' : 'Terkena Ular!', slide.msg, slide.type === 'ladder' ? 'fa-arrow-up text-green-500' : 'fa-arrow-down text-red-500');
+                playSound(slide.type);
+                player.position = slide.end;
+                drawPlayers();
+                updatePlayerStatsUI();
+                await new Promise(r => setTimeout(r, 600));
+                // Evaluate the new square after slide (without repeating slides to prevent infinite loops)
+                pos = player.position;
+            }
+
+            // 3. Check Special Squares
+            const special = specialSquaresMapping[pos];
+            if (special) {
+                if (special.type === 'question') {
+                    await triggerQuestion(player);
+                } else if (special.type === 'hikmah' || special.type === 'reflect') {
+                    playSound('correct');
+                    if(special.pts) player.score += special.pts;
+                    await showNotificationModal(special.title, special.msg, 'fa-lightbulb text-yellow-400');
+                } else if (special.type === 'bonus') {
+                    playSound('ladder');
+                    if(special.pts) player.score += special.pts;
+                    await showNotificationModal(special.title, special.msg, 'fa-gift text-green-500');
+                    if(special.move) {
+                        player.position += special.move;
+                        if(player.position > 50) player.position = 50;
+                        drawPlayers();
+                        updatePlayerStatsUI();
+                    }
+                } else if (special.type === 'danger') {
+                    playSound('wrong');
+                    if(special.pts) player.score += special.pts;
+                    await showNotificationModal(special.title, special.msg, 'fa-triangle-exclamation text-red-500');
+                    if(special.move) {
+                        player.position += special.move;
+                        drawPlayers();
+                        updatePlayerStatsUI();
+                    }
+                }
+                updatePlayerStatsUI();
+            }
+
+            // Check win again in case bonus moved them to 50
+            if (player.position === 50) {
+                await triggerWin();
+                return;
+            }
+
+            nextTurn();
+        }
+
+        function nextTurn() {
+            state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.playersCount;
+            state.isRolling = false;
+            const btn = document.getElementById('btn-roll');
+            btn.disabled = false;
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            document.getElementById('dice-result-text').innerText = "";
+            updateTurnUI();
+        }
+
+        // --- 6. MODAL SYSTEM ---
+
+        function showModal(modalId) {
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('hidden');
+            // Trigger animation
+            modal.classList.add('modal-enter');
+            setTimeout(() => {
+                modal.classList.remove('modal-enter');
+                modal.classList.add('modal-enter-active');
+            }, 10);
+        }
+
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('modal-enter-active');
+            modal.classList.add('modal-exit-active');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.classList.remove('modal-exit-active');
+                document.getElementById('modal-overlay').classList.add('hidden');
+            }, 200);
+        }
+
+        function showNotificationModal(title, message, iconClass) {
+            return new Promise(resolve => {
+                document.getElementById('sp-title').innerText = title;
+                document.getElementById('sp-message').innerText = message;
+                document.getElementById('sp-icon').className = `fa-solid ${iconClass}`;
+                
+                // Color header based on icon class vaguely
+                const header = document.getElementById('sp-header');
+                header.className = 'p-6 text-white text-5xl bg-gray-800'; // Default
+                if(iconClass.includes('green') || iconClass.includes('arrow-up')) header.className = 'p-6 text-white text-5xl bg-green-500';
+                if(iconClass.includes('red') || iconClass.includes('arrow-down')) header.className = 'p-6 text-white text-5xl bg-red-500';
+                if(iconClass.includes('yellow')) header.className = 'p-6 text-white text-5xl bg-yellow-500';
+
+                const btn = document.getElementById('btn-sp-continue');
+                // Remove old event listeners
+                const newBtn = btn.cloneNode(true);
+                btn.parentNode.replaceChild(newBtn, btn);
+                
+                newBtn.addEventListener('click', () => {
+                    hideModal('modal-special');
+                    resolve();
+                });
+
+                showModal('modal-special');
+            });
+        }
+
+        function getQuestion() {
+            // Filter by difficulty if not 'all'
+            let pool = state.questionPool;
+            if (state.difficulty !== 'all') {
+                pool = pool.filter(q => q.diff === state.difficulty);
+            }
+            // Fallback if pool empty for difficulty
+            if(pool.length === 0) pool = state.questionPool;
+
+            // Find unused
+            let available = pool.filter(q => !state.usedQuestions.includes(q.q));
+            if (available.length === 0) {
+                // Reset used if all used
+                state.usedQuestions = [];
+                available = pool;
+            }
+            
+            const q = available[0];
+            state.usedQuestions.push(q.q);
+            return q;
+        }
+
+        function triggerQuestion(player) {
+            return new Promise(resolve => {
+                const qData = getQuestion();
+                
+                document.getElementById('q-category-badge').innerText = qData.cat;
+                document.getElementById('q-difficulty-badge').innerText = qData.diff;
+                document.getElementById('q-text').innerText = qData.q;
+                
+                const optsContainer = document.getElementById('q-options');
+                optsContainer.innerHTML = '';
+                
+                // Hide feedback area
+                document.getElementById('q-feedback').classList.add('hidden');
+                
+                // Render options
+                qData.o.forEach((optText, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-islamic-green hover:bg-green-50 transition font-medium text-gray-700';
+                    btn.innerText = optText;
+                    btn.onclick = () => handleAnswer(idx, qData.a, qData.exp, player, resolve, optsContainer);
+                    optsContainer.appendChild(btn);
+                });
+
+                showModal('modal-question');
+            });
+        }
+
+        function handleAnswer(selectedIndex, correctIndex, explanation, player, resolve, optsContainer) {
+            // Disable buttons
+            Array.from(optsContainer.children).forEach((btn, idx) => {
+                btn.onclick = null;
+                btn.classList.remove('hover:border-islamic-green', 'hover:bg-green-50');
+                if(idx === correctIndex) {
+                    btn.classList.add('bg-green-100', 'border-green-500', 'text-green-800');
+                    btn.innerHTML += ' <i class="fa-solid fa-check-circle float-right mt-1"></i>';
+                } else if(idx === selectedIndex && idx !== correctIndex) {
+                    btn.classList.add('bg-red-100', 'border-red-500', 'text-red-800');
+                    btn.innerHTML += ' <i class="fa-solid fa-times-circle float-right mt-1"></i>';
+                } else {
+                    btn.classList.add('opacity-50');
+                }
+            });
+
+            const isCorrect = (selectedIndex === correctIndex);
+            
+            const fbArea = document.getElementById('q-feedback');
+            const fbTitle = document.getElementById('q-feedback-title');
+            const fbPoints = document.getElementById('q-feedback-points');
+            const fbIcon = document.getElementById('q-feedback-icon');
+            
+            if(isCorrect) {
+                playSound('correct');
+                player.score += 10;
+                player.correct++;
+                fbTitle.innerText = "BENAR! 🔥 Mantap!";
+                fbTitle.className = "font-bold text-xl text-green-600";
+                fbPoints.innerText = "+10 Poin";
+                fbPoints.className = "text-sm font-bold mt-1 text-green-600 bg-green-100 inline-block px-2 py-1 rounded";
+                fbIcon.innerHTML = '<i class="fa-solid fa-circle-check text-green-500"></i>';
+            } else {
+                playSound('wrong');
+                player.wrong++;
+                fbTitle.innerText = "BELUM TEPAT 😅";
+                fbTitle.className = "font-bold text-xl text-red-600";
+                fbPoints.innerText = "0 Poin";
+                fbPoints.className = "text-sm font-bold mt-1 text-red-600 bg-red-100 inline-block px-2 py-1 rounded";
+                fbIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-red-500"></i>';
+                
+                // Penalty
+                player.position = Math.max(1, player.position - 1);
+                drawPlayers();
+            }
+            
+            document.getElementById('q-feedback-explanation').innerText = explanation;
+            fbArea.classList.remove('hidden');
+            
+            updatePlayerStatsUI();
+
+            const continueBtn = document.getElementById('btn-q-continue');
+            const newBtn = continueBtn.cloneNode(true);
+            continueBtn.parentNode.replaceChild(newBtn, continueBtn);
+            
+            newBtn.addEventListener('click', () => {
+                hideModal('modal-question');
+                resolve();
+            });
+        }
+
+        async function triggerWin() {
+            state.gameActive = false;
+            playSound('win');
+            triggerConfetti();
+            
+            const winner = state.players[state.currentPlayerIndex];
+            document.getElementById('winner-name').innerText = winner.name;
+            document.getElementById('winner-name').style.color = winner.color;
+
+            const statsContainer = document.getElementById('result-stats');
+            statsContainer.innerHTML = '';
+            
+            // Sort by score
+            const sortedPlayers = [...state.players].sort((a,b) => {
+                if (a.position === 50) return -1; // Winner always first
+                if (b.position === 50) return 1;
+                return b.score - a.score; // Then by score
+            });
+
+            sortedPlayers.forEach((p, idx) => {
+                const totalQ = p.correct + p.wrong;
+                const acc = totalQ > 0 ? Math.round((p.correct / totalQ) * 100) : 0;
+                
+                statsContainer.innerHTML += `
+                    <div class="bg-white p-4 rounded-lg shadow-sm border-l-4" style="border-color: ${p.color}">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-gray-800">${idx === 0 ? '<i class="fa-solid fa-crown text-yellow-500 mr-1"></i>' : ''} ${p.name}</span>
+                            <span class="font-bold bg-gray-100 px-2 py-1 rounded text-sm">Posisi: ${p.position} | Skor: ${p.score}</span>
+                        </div>
+                        <div class="flex gap-4 text-sm text-gray-600">
+                            <span><i class="fa-solid fa-check text-green-500"></i> Benar: ${p.correct}</span>
+                            <span><i class="fa-solid fa-times text-red-500"></i> Salah: ${p.wrong}</span>
+                            <span><i class="fa-solid fa-bullseye text-blue-500"></i> Akurasi: ${acc}%</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            setTimeout(() => {
+                showModal('modal-result');
+            }, 1000);
+        }
+
+        function triggerConfetti() {
+            // Simple canvas confetti without external library
+            const canvas = document.createElement('canvas');
+            canvas.style.position = 'fixed';
+            canvas.style.inset = '0';
+            canvas.style.width = '100vw';
+            canvas.style.height = '100vh';
+            canvas.style.pointerEvents = 'none';
+            canvas.style.zIndex = '9999';
+            document.body.appendChild(canvas);
+            
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const pieces = [];
+            for(let i=0; i<100; i++) {
+                pieces.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    vx: (Math.random() - 0.5) * 5,
+                    vy: Math.random() * 5 + 2,
+                    size: Math.random() * 10 + 5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    rot: Math.random() * 360,
+                    rotSpeed: (Math.random() - 0.5) * 10
+                });
+            }
+            
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                let active = false;
+                pieces.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.rot += p.rotSpeed;
+                    if(p.y < canvas.height) active = true;
+                    
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot * Math.PI / 180);
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+                    ctx.restore();
+                });
+                if(active) requestAnimationFrame(animate);
+                else canvas.remove();
+            }
+            animate();
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('btn-sound');
+            if(soundEnabled) {
+                btn.innerHTML = '<i class="fa-solid fa-volume-high"></i>';
+                btn.classList.add('text-islamic-green');
+                btn.classList.remove('text-red-500');
+                // Resume audio context if suspended
+                if(audioCtx.state === 'suspended') audioCtx.resume();
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+                btn.classList.remove('text-islamic-green');
+                btn.classList.add('text-red-500');
+            }
+        }
+
+        // Initialize setup UI on load
+        window.onload = () => {
+            renderPlayerNameInputs();
+            // Pre-warm audio context warning
+            console.log("Game Loaded. Audio will initialize on first interaction.");
+        };
+
+    </script>
+</body>
+</html>
